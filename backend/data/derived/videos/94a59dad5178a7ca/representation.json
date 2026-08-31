@@ -1,0 +1,60 @@
+{
+  "video_id": "94a59dad5178a7ca",
+  "duration_seconds": 36.833333,
+  "width": 1340,
+  "height": 1434,
+  "fps": 59.240849525530955,
+  "codec": "h264",
+  "audio_present": false,
+  "audio_codec": null,
+  "bit_rate": 921083,
+  "source_path": "/Users/abhinav/Desktop/Screen Recording 2026-02-13 at 10.04.33\u202fPM.mov",
+  "normalized_path": "/Users/abhinav/Desktop/Projects/mergecut/backend/data/derived/videos/94a59dad5178a7ca/Screen Recording 2026-02-13 at 10.04.33\u202fPM.working.mp4",
+  "audio_path": null,
+  "normalization": {
+    "normalized": false,
+    "reason": null
+  },
+  "metadata": {
+    "duration_seconds": 36.833333,
+    "width": 1340,
+    "height": 1434,
+    "fps": 59.240849525530955,
+    "codec": "h264",
+    "audio_present": false,
+    "audio_codec": null,
+    "bit_rate": 921083
+  },
+  "shots": [
+    {
+      "shot_id": "shot_0000",
+      "start": 0.0,
+      "end": 6.026247139588101,
+      "keyframe_paths": [
+        "/Users/abhinav/Desktop/Projects/mergecut/backend/data/derived/videos/94a59dad5178a7ca/shot_0000.jpg"
+      ],
+      "transcript": "",
+      "transcript_segments": []
+    },
+    {
+      "shot_id": "shot_0001",
+      "start": 6.026247139588101,
+      "end": 23.868665141113652,
+      "keyframe_paths": [
+        "/Users/abhinav/Desktop/Projects/mergecut/backend/data/derived/videos/94a59dad5178a7ca/shot_0001.jpg"
+      ],
+      "transcript": "",
+      "transcript_segments": []
+    },
+    {
+      "shot_id": "shot_0002",
+      "start": 23.868665141113652,
+      "end": 36.83269260106788,
+      "keyframe_paths": [
+        "/Users/abhinav/Desktop/Projects/mergecut/backend/data/derived/videos/94a59dad5178a7ca/shot_0002.jpg"
+      ],
+      "transcript": "",
+      "transcript_segments": []
+    }
+  ]
+}
