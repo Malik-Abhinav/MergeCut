@@ -39,6 +39,37 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
+
+def _abort_if_not_uv_venv() -> None:
+    """Fail fast with an actionable message when invoked under the wrong Python.
+
+    `run_spike.py` imports the full backend (pydantic_settings,
+    httpx, etc.). It only works under `uv run --project backend` or
+    from inside backend/.venv. Running with system python3 (e.g. macOS
+    /usr/bin/python3 = 3.9.6) fails with a confusing
+    ModuleNotFoundError. Detect that case by sys.prefix and exit
+    early with the right command.
+    """
+    if sys.prefix != getattr(sys, "base_prefix", sys.prefix):
+        return
+    msg = (
+        "run_spike.py must run inside the backend uv venv "
+        "(Python 3.12 + httpx + pydantic).\n\n"
+        "Use one of:\n"
+        "  uv run --project backend python scripts/run_spike.py\n"
+        "  cd backend && uv run python scripts/run_spike.py\n"
+        "  make spike           # live M3 calls (requires GMI_API_KEY)\n"
+        "  make spike-dry       # fixture + schema validation only\n\n"
+        f"Detected sys.executable={sys.executable} "
+        f"(sys.prefix={sys.prefix}).\n"
+    )
+    sys.stderr.write(msg)
+    sys.stderr.flush()
+    raise SystemExit(2)
+
+
+_abort_if_not_uv_venv()
+
 from app.config import get_settings  # noqa: E402
 from app.services.minimax import (  # noqa: E402
     MiniMaxClient,

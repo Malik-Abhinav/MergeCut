@@ -35,6 +35,49 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
+
+def _abort_if_not_uv_venv() -> None:
+    """Fail fast with an actionable message when invoked under the wrong Python.
+
+    The pipeline imports `pydantic_settings`, `fastapi`, `scenedetect`,
+    `faster-whisper`, etc. — none of which exist on a bare system Python
+    (e.g. macOS system /usr/bin/python3 = 3.9.6). The project pins
+    Python 3.12 via `uv` (see backend/pyproject.toml), so any direct
+    `python3 scripts/test_real_speech.py ...` invocation falls over
+    with a confusing ModuleNotFoundError.
+
+    Detect that case by checking sys.prefix: in a uv venv, sys.prefix
+    points to backend/.venv (not /usr or /Library/...). If we're NOT
+    in a venv that has `pydantic_settings` importable, print the
+    correct command and exit.
+    """
+    # sys.prefix is the install prefix; in a venv it differs from
+    # sys.base_prefix. bare-uv-run also installs into the project
+    # venv, so any prefix that's not base_prefix means we're isolated.
+    in_venv = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
+    if in_venv:
+        return
+    # Not in a venv. Check whether the requested import would even
+    # work from the cwd — usually it won't because the deps live in
+    # backend/.venv. But before we test-import (which prints an ugly
+    # traceback on failure), just tell the user how to run it.
+    msg = (
+        "test_real_speech.py must run inside the backend uv venv "
+        "(Python 3.12 + Phase 2 deps).\n\n"
+        "Use one of:\n"
+        "  cd backend && uv run python scripts/test_real_speech.py <video>\n"
+        "  uv run --project backend python scripts/test_real_speech.py <video>\n"
+        "  make real-speech REAL_SPEECH_VIDEO=<video>\n\n"
+        f"Detected sys.executable={sys.executable} "
+        f"(sys.prefix={sys.prefix}).\n"
+    )
+    sys.stderr.write(msg)
+    sys.stderr.flush()
+    raise SystemExit(2)
+
+
+_abort_if_not_uv_venv()
+
 from app.models.media import MediaError, UnsupportedFormatError  # noqa: E402
 from app.services.media.pipeline import process_video  # noqa: E402
 
