@@ -10,7 +10,6 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 PYTHON  ?= python3
-UV      ?= uv
 NODE    ?= node
 NPM     ?= npm
 BACKEND := backend
@@ -20,6 +19,30 @@ FRONTEND := frontend
 # and we don't depend on whatever the system Python3 is (Hermes host has
 # 3.9.6; we want 3.12 per PROJECT_PLAN §10).
 UV_PYTHON ?= 3.12
+
+# Resolve uv from a list of known locations. Make recipes do NOT source
+# ~/.zshrc / ~/.bashrc, so `uv` may not be on PATH when Make is invoked
+# from an IDE-integrated terminal, a non-interactive subprocess, or any
+# context that launches without the user's full login env. We probe
+# a handful of standard install locations and abort with an actionable
+# error if none of them has a working uv binary.
+#
+# Implementation note: we assign into _UV_AUTO with `:=` (immediate,
+# evaluated exactly once) instead of `?=` with a `$(shell …)` RHS,
+# because Make re-evaluates the `$(shell …)` template on every variable
+# expansion — which would cause the resolved path to be appended to
+# itself in recipe commands and produce "uv /path/to/uv …" with the
+# duplicate argument. Splitting into two vars sidesteps that entirely.
+UV_LOCATIONS := $(HOME)/.hermes/bin/uv \
+                $(HOME)/.local/bin/uv \
+                $(HOME)/.cargo/bin/uv \
+                /opt/homebrew/bin/uv \
+                /usr/local/bin/uv
+_UV_AUTO := $(shell found=""; for p in $(UV_LOCATIONS); do [ -x "$$p" ] && found="$$p" && break; done; if [ -n "$$found" ]; then echo "$$found"; else command -v uv 2>/dev/null || true; fi)
+ifeq ($(_UV_AUTO),)
+$(error Could not find 'uv' on PATH or in any of: $(UV_LOCATIONS). Install with: curl -LsSf https://astral.sh/uv/install.sh | sh)
+endif
+UV ?= $(_UV_AUTO)
 
 # ---- Help ------------------------------------------------------------------
 
@@ -79,7 +102,7 @@ media-smoke: backend-install ## Build Phase 2 fixtures + run pipeline
 
 .PHONY: real-speech
 real-speech: backend-install ## Run the pipeline against a real video (positional arg: path)
-	cd $(BACKEND) && $(UV) run python scripts/test_real_speech.py $(REAL_SPEECH_VIDEO)
+	cd $(BACKEND) && $(UV) run python ../scripts/test_real_speech.py $(abspath $(REAL_SPEECH_VIDEO))
 
 REAL_SPEECH_VIDEO ?= path/to/video.mp4
 
