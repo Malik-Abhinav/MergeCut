@@ -1,0 +1,60 @@
+{
+  "video_id": "a86a433ed1843353",
+  "duration_seconds": 6.0,
+  "width": 320,
+  "height": 240,
+  "fps": 30.0,
+  "codec": "h264",
+  "audio_present": true,
+  "audio_codec": "aac",
+  "bit_rate": 85350,
+  "source_path": "/private/var/folders/rq/r6d29_j15bndthhkq50wtlgm0000gn/T/pytest-of-abhinav/pytest-5/test_process_video_normal_full0/normal_3shots_320x240_30fps.mp4",
+  "normalized_path": "/Users/abhinav/Desktop/Projects/mergecut/backend/data/derived/videos/a86a433ed1843353/normal_3shots_320x240_30fps.working.mp4",
+  "audio_path": "/Users/abhinav/Desktop/Projects/mergecut/backend/data/derived/videos/a86a433ed1843353/normal_3shots_320x240_30fps.working.mono16k.wav",
+  "normalization": {
+    "normalized": false,
+    "reason": null
+  },
+  "metadata": {
+    "duration_seconds": 6.0,
+    "width": 320,
+    "height": 240,
+    "fps": 30.0,
+    "codec": "h264",
+    "audio_present": true,
+    "audio_codec": "aac",
+    "bit_rate": 85350
+  },
+  "shots": [
+    {
+      "shot_id": "shot_0000",
+      "start": 0.0,
+      "end": 2.0,
+      "keyframe_paths": [
+        "/Users/abhinav/Desktop/Projects/mergecut/backend/data/derived/videos/a86a433ed1843353/shot_0000.jpg"
+      ],
+      "transcript": "",
+      "transcript_segments": []
+    },
+    {
+      "shot_id": "shot_0001",
+      "start": 2.0,
+      "end": 4.0,
+      "keyframe_paths": [
+        "/Users/abhinav/Desktop/Projects/mergecut/backend/data/derived/videos/a86a433ed1843353/shot_0001.jpg"
+      ],
+      "transcript": "",
+      "transcript_segments": []
+    },
+    {
+      "shot_id": "shot_0002",
+      "start": 4.0,
+      "end": 6.0,
+      "keyframe_paths": [
+        "/Users/abhinav/Desktop/Projects/mergecut/backend/data/derived/videos/a86a433ed1843353/shot_0002.jpg"
+      ],
+      "transcript": "",
+      "transcript_segments": []
+    }
+  ]
+}

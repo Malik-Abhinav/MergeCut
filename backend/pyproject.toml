@@ -1,0 +1,70 @@
+[project]
+name = "mergecut-backend"
+version = "0.1.0"
+description = "MergeCut backend — semantic three-way merge analyzer for video"
+requires-python = ">=3.12"
+readme = "README.md"
+
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    "httpx>=0.27.0",
+    "python-multipart>=0.0.9",
+    # Phase 2 — media preprocessing. Pinned to versions known to
+    # work together on Python 3.12 with the system FFmpeg 9.x.
+    #
+    # We deliberately use the system FFmpeg (via subprocess) for
+    # metadata extraction, normalization, and audio decoding. That
+    # keeps the project tied to a single FFmpeg version (the one we
+    # already require for `make check-ffmpeg`) and avoids the
+    # duplicate-FFmpeg-bundles problem we'd otherwise hit when both
+    # opencv-python and PyAV each ship their own FFmpeg with
+    # conflicting ObjC class registrations on macOS.
+    # Pin scenedetect < 0.7 because the [opencv] extra was removed
+    # in 0.7.x and is now implicitly required. On Python 3.12 +
+    # macOS arm64, the opencv-python 5.0 wheel does not actually
+    # expose the `cv2` module (the directory is missing), so we
+    # need the explicit extra to pull in opencv-python-headless
+    # (which does expose `cv2`).
+    "scenedetect[opencv]>=0.6.5,<0.7",
+    "opencv-python-headless>=4.10.0",
+    "Pillow>=10.4.0",
+    "numpy>=1.26.0,<3.0",
+    "faster-whisper>=1.0.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.5.0",
+    "mypy>=1.10.0",
+    "types-python-dateutil>=2.9.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "N"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-ra --strict-markers"
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+ignore_missing_imports = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

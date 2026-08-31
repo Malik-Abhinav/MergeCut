@@ -1,0 +1,47 @@
+{
+  "video_id": "53019d28cee5911f",
+  "duration_seconds": 15.766099,
+  "width": 1620,
+  "height": 1080,
+  "fps": 29.932985852568876,
+  "codec": "h264",
+  "audio_present": true,
+  "audio_codec": "aac",
+  "bit_rate": 11970516,
+  "source_path": "/Users/abhinav/Desktop/Projects/mergecut/backend/tests/manual/real_speech_test.mov",
+  "normalized_path": "/Users/abhinav/Desktop/Projects/mergecut/backend/data/derived/videos/53019d28cee5911f/real_speech_test.working.mp4",
+  "audio_path": "/Users/abhinav/Desktop/Projects/mergecut/backend/data/derived/videos/53019d28cee5911f/real_speech_test.working.mono16k.wav",
+  "normalization": {
+    "normalized": false,
+    "reason": null
+  },
+  "metadata": {
+    "duration_seconds": 15.766099,
+    "width": 1620,
+    "height": 1080,
+    "fps": 29.932985852568876,
+    "codec": "h264",
+    "audio_present": true,
+    "audio_codec": "aac",
+    "bit_rate": 11970516
+  },
+  "shots": [
+    {
+      "shot_id": "shot_0000",
+      "start": 0.0,
+      "end": 15.668333333333333,
+      "keyframe_paths": [
+        "/Users/abhinav/Desktop/Projects/mergecut/backend/data/derived/videos/53019d28cee5911f/shot_0000.jpg"
+      ],
+      "transcript": "This is the first success section. Now I am talking about the blue box. This is the final section.",
+      "transcript_segments": [
+        {
+          "start": 1.42,
+          "end": 12.92,
+          "text": "This is the first success section. Now I am talking about the blue box. This is the final section.",
+          "confidence": 0.9141462162921303
+        }
+      ]
+    }
+  ]
+}
