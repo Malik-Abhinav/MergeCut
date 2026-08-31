@@ -102,7 +102,7 @@ media-smoke: backend-install ## Build Phase 2 fixtures + run pipeline
 
 .PHONY: real-speech
 real-speech: backend-install ## Run the pipeline against a real video (positional arg: path)
-	cd $(BACKEND) && $(UV) run python ../scripts/test_real_speech.py $(abspath $(REAL_SPEECH_VIDEO))
+	cd $(BACKEND) && $(UV) run python ../scripts/test_real_speech.py "$(REAL_SPEECH_VIDEO)"
 
 REAL_SPEECH_VIDEO ?= path/to/video.mp4
 

@@ -110,9 +110,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if not args.video.exists():
+    # Resolve relative paths against the repo root (parent of
+    # backend/), not the cwd. After `cd backend && uv run ...` the
+    # cwd is backend/, but users naturally pass repo-root-relative
+    # paths like `tests/manual/foo.mov`. Without this fallback,
+    # those paths would resolve to backend/tests/manual/foo.mov and
+    # silently miss. Absolute paths are kept as-is. Paths with
+    # spaces survive correctly because argparse preserves the
+    # original string — no shell word-splitting happens here.
+    video_path = args.video
+    if not video_path.exists():
+        candidate = ROOT / video_path
+        if candidate.exists():
+            video_path = candidate
+    if not video_path.exists():
         print(f"ERROR: video not found: {args.video}", file=sys.stderr)
         return 2
+    args.video = video_path
 
     try:
         rep = process_video(args.video)
