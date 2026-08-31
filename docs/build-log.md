@@ -505,3 +505,100 @@ explicit next instruction to begin alignment (Phase 3).
 Phase 1 v1 / v2 results were not modified by this entry; the
 v2.1.0 artifact was regenerated only to fix the FP/FN label swap
 (documented above).
+
+---
+
+## 2026-08-31 — Phase 2.5: real-speech validation + Makefile robustness
+
+### Real-speech run against a real recording
+
+Validated `make real-speech` against
+`backend/tests/manual/real_speech_test.mov` (15.77 s, h264
+1620x1080 @ 29.93 fps, aac audio):
+
+```
+video
+=====
+path               .../real_speech_test.mov
+video_id           53019d28cee5911f
+duration           00:15.766 (15.77s)
+dimensions         1620x1080
+fps                29.933
+video codec        h264
+audio              yes (aac)
+normalization      copy
+working file       .../data/derived/videos/53019d28cee5911f/real_speech_test.working.mp4
+audio file         .../data/derived/videos/53019d28cee5911f/real_speech_test.working.mono16k.wav
+
+shots (1)
+=========
+  shot_0000  00:00.000 – 00:15.668  (15.67s)  keyframes=1  segments=1
+      text: This is the first success section. Now I am talking about the blue box. This ...
+
+transcript segments (1)
+=======================
+  -- shot_0000 (00:00.000 – 00:15.668) --
+  00:01.420 – 00:12.920  conf=0.91  This is the first success section. Now I am talking about the blue box. This is the final section.
+
+summary
+=======
+shots detected     1
+transcript segments 1
+transcript chars   98
+  shot_0000     98 chars     6.3 chars/sec
+```
+
+Observations:
+
+- Single continuous shot detected across the entire15 s clip —
+  correct (no scene cuts in this recording).
+- Transcript text is clean and matches the user's spoken content
+  (the user's reference sentence about the blue box).
+- Confidence 0.91 on faster-whisper `base` model — acceptable for
+  the demo. Larger models (`small`, `medium`) would push this
+  higher but cost more time and disk.
+- Normalization was skipped (source already h264/yuv420p/aac/29.93
+  fps) — the `copy` branch of `_needs_normalization` fired.
+
+### Makefile bugs found and fixed during this run
+
+1. **Duplicate `uv` substitution in recipes.** `make real-speech`
+   printed `cd backend && /Users/abhinav/.hermes/bin/uv
+   /Users/abhinav/.hermes/bin/uv python install 3.12` and failed
+   with `unrecognized subcommand /Users/abhinav/.hermes/bin/uv`.
+   Root cause: the auto-detect shell template printed the path
+   twice — once from the `[ -x ]` for-loop, once from the
+   always-firing `command -v uv` fallback. Fix: collect the
+   for-loop result into a `found` variable and only call
+   `command -v uv` when `found` is empty.
+
+2. **`real-speech` target passed a repo-root-relative path into
+   a script whose cwd was `backend/`.** The recipe did
+   `cd backend && uv run python ../scripts/test_real_speech.py
+   $(REAL_SPEECH_VIDEO)`, so passing
+   `backend/tests/manual/foo.mov` (relative to the repo root)
+   resolved to `backend/backend/tests/manual/foo.mov` after the
+   `cd`. Fix: wrap the path in `$(abspath ...)` so it's absolute
+   and cwd-independent.
+
+3. **PATH-dependent `uv` invocation.** `make` recipes don't source
+   `~/.zshrc`/`~/.bashrc`, so on hosts where the user's interactive
+   shell exports `uv` from `~/.hermes/bin` but the Make process
+   inherits a stripped PATH, the bare `uv` command fails. Fix: the
+   auto-detect template now probes `~/.hermes/bin/uv`,
+   `~/.local/bin/uv`, `~/.cargo/bin/uv`, `/opt/homebrew/bin/uv`,
+   `/usr/local/bin/uv`, then falls back to `command -v uv`. If
+   nothing matches, Make aborts with an actionable install
+   instruction. Verified: with `PATH=/usr/bin:/bin` (only), the
+   Makefile still resolves `uv` and `make backend-install` works.
+
+### Phase 2.5 decision
+
+**GO.** The Phase 2 pipeline runs end-to-end on a real recording
+with real speech. The transcript quality is usable for Phase 3
+alignment (even though we expect Phase 5 to characterize accuracy
+on a larger evaluation set). No code changes were made to the
+pipeline itself during this validation.
+
+Stopping before Phase 3 per the user's instructions. Awaiting an
+explicit next instruction to begin alignment (Phase 3).
