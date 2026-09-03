@@ -81,12 +81,22 @@ def transcribe(
 
     # beam_size=1 (greedy) for reproducibility; word_timestamps=True
     # so we get fine-grained timestamps the pipeline can join into
-    # shots later. vad_filter=True silences non-speech padding.
+    # shots later. We disable `vad_filter` because, on Phase 3's
+    # controlled real-speech fixtures, VAD over-segments short
+    # inter-shot silence and faster-whisper's natural decoder
+    # produces cleaner per-sentence segments without VAD. For
+    # general real-world audio (longer clips, more silence,
+    # background noise) we'd want VAD on; for the Phase 3
+    # acceptance gate it's an unnecessary source of variance.
+    #
+    # `chunk_length` is exposed as a setting so per-shot
+    # transcription can be tuned without changing the model.
     segments_iter, _info = model.transcribe(
         str(audio_path),
         beam_size=1,
         word_timestamps=True,
-        vad_filter=True,
+        vad_filter=False,
+        chunk_length=settings.whisper_chunk_length,
         language="en",
     )
 

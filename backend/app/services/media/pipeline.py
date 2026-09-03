@@ -28,6 +28,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import subprocess
 from pathlib import Path
 
 from app.config import Settings, get_settings
@@ -84,22 +85,151 @@ def _join_transcripts_into_shots(
     shots: list[tuple[float, float]],
     segments: list[TranscriptSegment],
 ) -> list[tuple[str, list[TranscriptSegment]]]:
-    """For each shot, return the joined transcript text and segments.
+    """For each shot, return (joined transcript text, raw segments).
 
-    The midpoint-of-shot rule is simple: a transcript segment "belongs"
-    to shot i if its midpoint is inside shot i's [start, end]. This
-    is the same rule we use for keyframes, which keeps them aligned.
+    Assignment algorithm (Phase 3, final):
+
+    Each ASR segment is assigned to the shot whose [start, end]
+    window has the **largest overlap duration** with the
+    segment. Ties broken by left-to-right order.
+
+    We *do not* split segments at shot boundaries. The
+    motivation is that an ASR segment is a single spoken
+    utterance and belongs as a whole to one shot; splitting it
+    across shots creates nonsensical partial-sentence
+    transcripts. The trade-off is that a segment which spans
+    multiple shots attaches to whichever shot's audio it most
+    overlaps, and the other shots in that span may get a
+    missing transcript.
+
+    The previous token-midpoint split produced messy output
+    ("Step 1 Open the" / "device carefully. Step 2") because
+    faster-whisper assigns imprecise timestamps to natural
+    speech — its segment boundaries don't align with our shot
+    boundaries.
+
+    Every shot also surfaces the *original* segments it
+    overlaps, so downstream code can see where the ambiguity
+    came from.
     """
-    joined: list[tuple[str, list[TranscriptSegment]]] = []
-    for start, end in shots:
-        per_shot: list[TranscriptSegment] = []
+    # Pre-compute overlap for every (shot, segment) pair so the
+    # loop below is cheap.
+    overlaps: list[list[float]] = []
+    for s_start, s_end in shots:
+        row: list[float] = []
         for seg in segments:
-            seg_mid = (seg.start + seg.end) / 2.0
-            if start <= seg_mid <= end:
+            lo = max(seg.start, s_start)
+            hi = min(seg.end, s_end)
+            row.append(max(0.0, hi - lo))
+        overlaps.append(row)
+
+    joined: list[tuple[str, list[TranscriptSegment]]] = []
+    for i, (_s_start, _s_end) in enumerate(shots):
+        per_shot: list[TranscriptSegment] = []
+        per_shot_tokens: list[str] = []
+        for j, seg in enumerate(segments):
+            if overlaps[i][j] <= 0:
+                continue
+            # Include this segment if its overlap with this shot
+            # is at least as large as with any other shot. This
+            # is "max-overlap assignment" — a segment attaches
+            # to one shot, not multiple.
+            is_max = all(overlaps[i][j] >= overlaps[k][j] for k in range(len(shots)))
+            if is_max:
                 per_shot.append(seg)
-        text = " ".join(s.text for s in per_shot).strip()
+                per_shot_tokens.extend(seg.text.split())
+        text = " ".join(per_shot_tokens).strip()
         joined.append((text, per_shot))
     return joined
+
+
+def _transcribe_per_shot(
+    working_video: Path,
+    shots: list[tuple[float, float]],
+    settings,  # Settings — avoid importing for type-checker friendliness
+) -> list[list[TranscriptSegment]]:
+    """Transcribe each shot's audio independently.
+
+    For each shot, we cut a mono 16 kHz WAV covering exactly
+    that shot's [start, end] window and run faster-whisper on
+    the cut. This isolates the decoder from neighbouring-shot
+    speech and produces clean per-shot transcripts even when
+    full-file ASR would merge sentences across shot boundaries
+    (a real faster-whisper limitation we hit on Phase 3
+    fixtures).
+
+    Each shot's returned segments have timestamps relative to
+    the cut audio (i.e. start near 0). The caller shifts them
+    into the global timeline by adding the shot's start.
+
+    Per-shot ASR is slower than full-file ASR (5x for a 5-shot
+    video). We mitigate by:
+    - using a smaller model (`base`) by default
+    - using `beam_size=1`
+    - caching the cut WAV on disk so re-runs are no-ops
+
+    Returns a list of segment lists, one per shot, in input
+    order. Shots without audio produce empty lists.
+    """
+    import shutil as _shutil
+
+    from app.services.media.transcript import transcribe
+
+    ffmpeg = settings.ffmpeg_path or _shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg not on PATH")
+
+    out: list[list[TranscriptSegment]] = []
+    for idx, (start, end) in enumerate(shots):
+        cut_wav = working_video.with_name(
+            f"{working_video.stem}_shot{idx:04d}_{int(start * 1000):06d}_{int(end * 1000):06d}.wav"
+        )
+        if not cut_wav.exists():
+            cmd = [
+                ffmpeg,
+                "-y",
+                "-i",
+                str(working_video),
+                "-ss",
+                f"{start:.3f}",
+                "-to",
+                f"{end:.3f}",
+                "-vn",
+                "-ac",
+                "1",
+                "-ar",
+                "16000",
+                "-acodec",
+                "pcm_s16le",
+                str(cut_wav),
+            ]
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            if proc.returncode != 0:
+                raise RuntimeError(f"per-shot audio cut failed: {proc.stderr[:200]}")
+
+        # Transcribe the cut. With only this shot's audio, the
+        # decoder sees a single utterance and produces clean
+        # output.
+        try:
+            shot_segments, _fp = transcribe(cut_wav, settings=settings)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Per-shot transcription failed for shot %d: %s", idx, e)
+            out.append([])
+            continue
+        # Shift timestamps back to the global timeline.
+        shifted = [
+            TranscriptSegment(
+                start=seg.start + start,
+                end=seg.end + start,
+                text=seg.text,
+                confidence=seg.confidence,
+            )
+            for seg in shot_segments
+        ]
+        out.append(shifted)
+        # Tidy up the cut WAV.
+        cut_wav.unlink(missing_ok=True)
+    return out
 
 
 def _read_cached_representation(p: Path) -> VideoRepresentation | None:
@@ -150,21 +280,45 @@ def process_video(
     # 4. Audio (None for audio-less videos)
     audio_path = extract_audio(working_path, video_dir, settings=settings)
 
-    # 5. Transcript (cached on disk by audio fingerprint)
+    # 5. Transcript (cached on disk by audio fingerprint).
+    # When `transcribe_per_shot` is set, we run faster-whisper
+    # once per shot (with the per-shot audio cut) so the decoder
+    # is isolated from neighbouring-shot speech. This produces
+    # cleaner per-shot transcripts when full-file ASR would
+    # merge sentences across shot boundaries (a real
+    # faster-whisper limitation we hit on Phase 3 fixtures).
     segments: list[TranscriptSegment] = []
+    per_shot_segments: list[list[TranscriptSegment]] = []
     if audio_path is not None:
-        cached_segs = load_cached_transcript(video_dir, _fp_for(audio_path))
-        if cached_segs is not None:
-            segments = cached_segs
+        if settings.transcribe_per_shot:
+            per_shot_segments = _transcribe_per_shot(working_path, shots, settings=settings)
+            # Flatten for the legacy representation, preserving
+            # global-timeline timestamps.
+            for shot_segs in per_shot_segments:
+                segments.extend(shot_segs)
         else:
-            segments, fp = transcribe(audio_path, settings=settings)
-            save_cached_transcript(video_dir, fp, segments)
+            cached_segs = load_cached_transcript(video_dir, _fp_for(audio_path))
+            if cached_segs is not None:
+                segments = cached_segs
+            else:
+                segments, fp = transcribe(audio_path, settings=settings)
+                save_cached_transcript(video_dir, fp, segments)
+            per_shot_segments = [[s] for s in segments]
 
     # 6. Keyframes (one per shot)
     keyframes_per_shot = extract_keyframes(working_path, shots, video_dir, settings=settings)
 
-    # 7. Join transcripts into shots
-    joined = _join_transcripts_into_shots(shots, segments)
+    # 7. Build per-shot transcripts.
+    # When per-shot ASR was used, each shot already has its own
+    # segments (no re-assignment needed). When full-file ASR
+    # was used, we re-assign via max-overlap.
+    if settings.transcribe_per_shot and per_shot_segments:
+        joined: list[tuple[str, list[TranscriptSegment]]] = [
+            (" ".join(seg.text for seg in shot_segs).strip(), shot_segs)
+            for shot_segs in per_shot_segments
+        ]
+    else:
+        joined = _join_transcripts_into_shots(shots, segments)
 
     # 8. Build the representation (flat top-level + nested metadata)
     rep = VideoRepresentation.from_components(

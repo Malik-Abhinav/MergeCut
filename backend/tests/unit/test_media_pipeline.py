@@ -62,6 +62,8 @@ def _isolate_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     settings = get_settings()
     monkeypatch.setattr(settings, "derived_dir", tmp_path / "derived")
     monkeypatch.setattr(settings, "upload_dir", tmp_path / "uploads")
+    # Phase 2 acceptance gate uses the legacy single-pass ASR.
+    monkeypatch.setattr(settings, "transcribe_per_shot", False)
     # Clear cached model handles between tests.
     clear_model_cache()
 

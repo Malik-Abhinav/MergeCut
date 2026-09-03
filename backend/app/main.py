@@ -1,14 +1,11 @@
-"""FastAPI application entrypoint (Phase 0).
-
-Only a health endpoint is wired up at this stage. Real routes for upload,
-analysis, resolution, and verification are introduced in later phases per
-PROJECT_PLAN §29.
-"""
+"""FastAPI application entrypoint for the MergeCut MVP."""
 
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.analyze import router as analyze_router
 from app.config import get_settings
 
 app = FastAPI(
@@ -19,6 +16,15 @@ app = FastAPI(
         "Built for MiniMax Week using MiniMax M3 through GMI Cloud."
     ),
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+app.include_router(analyze_router)
 
 
 @app.get("/health", tags=["meta"])
@@ -34,4 +40,4 @@ async def health() -> dict[str, str]:
 
 @app.get("/", tags=["meta"], include_in_schema=False)
 async def root() -> dict[str, str]:
-    return {"service": "mergecut", "phase": "0"}
+    return {"service": "mergecut", "status": "mvp"}
