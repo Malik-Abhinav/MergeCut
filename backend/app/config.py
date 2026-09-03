@@ -72,6 +72,29 @@ class Settings(BaseSettings):
     whisper_device: str = Field(default="cpu", description="faster-whisper device.")
     # Compute type for whisper: 'int8' | 'float16' | 'float32' | 'int8_float16' etc.
     whisper_compute_type: str = Field(default="int8", description="faster-whisper compute_type.")
+    # VAD minimum-silence threshold (ms). Default of faster-whisper
+    # is 2000ms, which is tuned for natural monologue and collapses
+    # short inter-shot silence; we tighten it so Phase 3 fixtures
+    # with sub-second silence boundaries produce separate segments.
+    whisper_min_silence_ms: int = Field(default=200, ge=50, le=2000)
+    # Whisper transcription chunk length (seconds). faster-whisper
+    # concatenates VAD chunks up to `chunk_length` seconds before
+    # running the decoder; smaller values force more (and shorter)
+    # decoded segments at the cost of slightly more overhead.
+    whisper_chunk_length: int = Field(default=5, ge=1, le=30)
+    # When True, the pipeline transcribes each shot's audio
+    # independently by cutting a per-shot WAV and running
+    # faster-whisper on the cut. This produces cleaner per-shot
+    # transcripts when full-file ASR merges sentences across
+    # shot boundaries, at the cost of N ASR passes for an N-shot
+    # video. Default True for Phase 3; Phase 2 acceptance tests
+    # override to False to keep the single-pass behaviour.
+    transcribe_per_shot: bool = Field(default=True)
+    # Max audio length (seconds) per shot. If a shot's audio
+    # exceeds this, the per-shot cut is rejected and the shot's
+    # transcript is left empty. Defensive against pathological
+    # long-shot fixtures.
+    max_shot_audio_seconds: float = Field(default=30.0, ge=1.0, le=120.0)
 
 
 @lru_cache(maxsize=1)
